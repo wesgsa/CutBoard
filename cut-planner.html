@@ -1,4 +1,5 @@
-<!doctype html>
+<!doctype
+    <!doctype html>
 <html lang="ko">
 
 <head>
@@ -147,9 +148,7 @@
             display: flex
         }
 
-        .boards button,
-        .arrow,
-        .collapse {
+          .boards button, .collapse {
             border: 1px solid var(--line);
             background: white;
             border-radius: 9px;
@@ -165,37 +164,25 @@
 
         .stage {
             height: calc(100% - 58px);
-            display: grid;
-            grid-template-columns: 48px 1fr 48px;
+            display: flex;
             align-items: center;
-            padding: 10px
-        }
-
-        .arrow {
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
-            font-size: 19px;
-            color: var(--accent);
-            box-shadow: 0 4px 12px #0001
-        }
-
-        .arrow:disabled {
-            opacity: .35
+            justify-content: center;
+            padding: 12px;
+            min-height: 0
         }
 
         .board {
             position: relative;
-            width: min(82%, 680px);
-            aspect-ratio: 1.62;
+            width: min(100%, 680px);
+            height: min(100%, 400px);
             margin: auto;
+            flex: none;
             background: #efe8d5;
             border: 1px solid #dcd2bb;
             box-shadow: 0 20px 45px #493b2518;
             overflow: hidden;
             transition: .3s
         }
-
         .board:before {
             content: "";
             position: absolute;
@@ -235,7 +222,9 @@
         .piece {
             position: absolute;
             z-index: 1;
-            border: 1px solid white;
+            border: 2px solid rgba(48, 57, 46, .72);
+            border-radius: 2px;
+            box-shadow: 0 1px 3px #24251c55;
             color: white;
             font-size: 10px;
             font-weight: 650;
@@ -248,21 +237,7 @@
             overflow: hidden
         }
 
-        .caption {
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            white-space: nowrap;
-            background: #fffefaed;
-            border: 1px solid var(--line);
-            border-radius: 99px;
-            padding: 7px 13px;
-            font-size: 10px;
-            color: #62675f
-        }
-
-        .stats {
+.stats {
             margin-top: 15px;
             overflow: hidden
         }
@@ -378,19 +353,25 @@
             font-size: 10px
         }
 
-        .item {
-            border: 1px solid var(--line);
-            border-radius: 11px;
-            padding: 10px;
-            margin-bottom: 8px
+        .table-header,
+        .table-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 58px 22px;
+            align-items: center;
+            gap: 6px
         }
 
-        .itemtop {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 11px;
-            font-weight: 700
+        .table-header {
+            padding: 0 5px 6px;
+            color: var(--muted);
+            font-size: 9px;
+            text-align: center
+        }
+
+        .table-row {
+            min-height: 42px;
+            border-top: 1px solid var(--line);
+            padding: 5px 2px
         }
 
         .del {
@@ -401,29 +382,17 @@
             cursor: pointer
         }
 
-        .fields {
-            display: grid;
-            grid-template-columns: 1fr 1fr 70px;
-            gap: 7px
-        }
-
-        .fields label {
-            font-size: 9px;
-            color: var(--muted)
-        }
-
-        .fields input {
-            display: block;
+        .table-row input {
             width: 100%;
-            margin-top: 4px;
             padding: 7px;
             border: 1px solid var(--line);
-            border-radius: 7px;
+            border-radius: 6px;
             font: inherit;
-            font-size: 11px
+            font-size: 11px;
+            text-align: right
         }
 
-        .fields input:focus {
+        .table-row input:focus {
             outline: 2px solid #dce9de
         }
 
@@ -431,6 +400,31 @@
             font-size: 9px;
             color: #9a9a90;
             margin-top: 5px
+        }
+
+        .gap-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 14px;
+            font-size: 11px
+        }
+
+        .gap-option div {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted)
+        }
+
+        .gap-option input {
+            width: 76px;
+            padding: 7px;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            font: inherit;
+            font-size: 11px;
+            color: var(--ink)
         }
 
         .toggle {
@@ -529,6 +523,14 @@
             border-radius: 9px
         }
 
+        .table-empty {
+            grid-column: 1 / -1;
+            padding: 10px 4px;
+            color: var(--muted);
+            font-size: 10px;
+            text-align: center
+        }
+
         code {
             font-size: 9px;
             color: #496954
@@ -576,17 +578,8 @@
             }
 
             .stage {
-                grid-template-columns: 38px 1fr 38px;
+                display: flex; justify-content: center;
                 padding: 7px 3px
-            }
-
-            .arrow {
-                width: 32px;
-                height: 32px
-            }
-
-            .board {
-                width: 88%
             }
 
             .status {
@@ -619,11 +612,11 @@
                         <div class="boards" id="boardnav"><button id="pb">‹</button><span id="bi">1 / 1</span><button
                                 id="nb">›</button></div>
                     </div>
-                    <div class="stage"><button class="arrow" id="ps" aria-label="이전 단계" disabled>‹</button>
+                    <div class="stage">
                         <div class="board" id="board"><span class="dim dimw" id="dw">—</span><span class="dim dimh"
                                 id="dh">—</span>
                             <div class="empty" id="empty">최적화 실행 후 배치가 여기에 표시됩니다</div>
-                        </div><button class="arrow" id="ns" aria-label="다음 단계" disabled>›</button>
+                        </div>
                     </div>
                 </section>
                 <section class="card stats" id="stats">
@@ -634,10 +627,22 @@
                             </svg></button>
                     </div>
                     <div class="stats-body">
-                        <div class="stat"><span>자재 사용률</span><strong id="usage">— %</strong></div>
-                        <div class="stat"><span>배치된 조각</span><strong id="placed">— 개</strong></div>
-                        <div class="stat"><span>실패한 조각</span><strong id="failed">— 개</strong></div>
-                        <div class="stat"><span>사용 판재</span><strong id="used">— 장</strong></div>
+                        <div class="stat">
+                            <span>자재 사용률</span>
+                            <strong id="usage">— %</strong>
+                        </div>
+                        <div class="stat">
+                            <span>배치된 조각</span>
+                            <strong id="placed">— 개</strong>
+                        </div>
+                        <div class="stat">
+                            <span>실패한 조각</span>
+                            <strong id="failed">— 개</strong>
+                        </div>
+                        <div class="stat">
+                            <span>사용 판재</span>
+                            <strong id="used">— 장</strong>
+                        </div>
                     </div>
                 </section>
             </main>
@@ -660,67 +665,391 @@
                             <div>회전 허용<small>조각을 90° 돌려 배치할 수 있어요</small></div><input id="rotation" type="checkbox"
                                 checked>
                         </div>
+                        <div class="gap-option">
+                            <label for="kerf">톱날 두께 (kerf)</label>
+                            <div>
+                                <input id="kerf" type="number" min="0" step="0.1" value="0">
+                                <span>mm</span>
+                            </div>
+                        </div>
+                        <div class="gap-option">
+                            <label for="edgeMargin">판 가장자리 여유</label>
+                            <div>
+                                <input id="edgeMargin" type="number" min="0" step="1" value="0">
+                                <span>mm</span>
+                            </div>
+                        </div>
                     </section>
                 </div>
                 <div class="dock">
-                    <div class="alert" id="alert" role="alert"></div><button class="run" id="run">✦　최적화된 자르기
-                        실행</button>
+                    <div class="alert" id="alert" role="alert"></div>
+                    <button class="run" id="run">✦　최적화된 자르기 실행</button>
                 </div>
             </aside>
         </div>
     </div>
     <script src="./compute.js"></script>
     <script>
-        const S = { boards: [{ id: 1, width: 2400, height: 1200, quantity: 2 }], pieces: [{ id: 1, width: 800, height: 400, quantity: 2 }, { id: 2, width: 600, height: 400, quantity: 1 }], layout: [], steps: [], board: 0, step: 0 }; let bid = 2, pid = 3; const $ = s => document.querySelector(s), colors = ['#73927a', '#8b90a6', '#c28a68', '#6c9a9c', '#bd9a52', '#9277a7']; function esc(x) { return String(x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) }
-        function renderList(type) { const board = type === 'boards', arr = S[type], root = $(board ? '#bl' : '#pl'); $(board ? '#bc' : '#pc').textContent = arr.length; root.innerHTML = arr.length ? '' : '<div class="emptylist">' + (board ? '원자재 판을 추가해 주세요' : '자를 조각을 추가해 주세요') + '</div>'; arr.forEach((v, i) => { let d = document.createElement('div'); d.className = 'item'; d.innerHTML = `<div class="itemtop">${board ? '판재' : '조각'} ${i + 1}<button class="del" aria-label="삭제">×</button></div><div class="fields"><label>가로<input type="number" min="1" value="${v.width}" data-k="width"></label><label>세로<input type="number" min="1" value="${v.height}" data-k="height"></label><label>수량<input type="number" min="1" value="${v.quantity}" data-k="quantity"></label></div>`; d.querySelector('.del').onclick = () => { arr.splice(i, 1); reset(); render() }; d.querySelectorAll('input').forEach(x => x.oninput = () => { v[x.dataset.k] = x.value === '' ? '' : Number(x.value); reset(); draw() }); root.append(d) }) }
-        function copies() { return S.boards.flatMap(b => Array.from({ length: Number(b.quantity) || 0 }, (_, i) => ({ b, i }))) } function current() { return copies()[S.board] } function render() { renderList('boards'); renderList('pieces'); draw() } function reset() { S.layout = []; S.steps = []; S.step = 0; $('#usage').textContent = '— %'; $('#placed').textContent = '— 개'; $('#failed').textContent = '— 개'; $('#used').textContent = '— 장'; $('#alert').classList.remove('on') }
+        const S = {
+            boards: [],
+            pieces: [
+                { id: 1, width: 800, height: 400, quantity: 2 },
+                { id: 2, width: 600, height: 400, quantity: 1 }
+            ],
+            layout: [],
+            board: 0
+        };
+
+        let bid = 1;
+        let pid = 3;
+        const $ = selector => document.querySelector(selector);
+        const colors = ['#73927a', '#8b90a6', '#c28a68', '#6c9a9c', '#bd9a52', '#9277a7'];
+
+        function esc(value) {
+            return String(value).replace(/[&<>"']/g, character => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[character]));
+        }
+
+        function renderList(type) {
+            const isBoard = type === 'boards';
+            const items = S[type];
+            const root = $(isBoard ? '#bl' : '#pl');
+            $(isBoard ? '#bc' : '#pc').textContent = items.length;
+            root.innerHTML = `
+                <div class="table-header" aria-hidden="true">
+                    <span>가로 mm</span><span>세로 mm</span><span>수량</span><span></span>
+                </div>
+                <div class="table-rows">
+                    ${items.length ? '' : `<div class="table-empty">${isBoard ? '원자재 판을 추가해 주세요' : '자를 조각을 추가해 주세요'}</div>`}
+                </div>`;
+            const rows = root.querySelector('.table-rows');
+
+            items.forEach((item, index) => {
+                const row = document.createElement('div');
+                row.className = 'table-row';
+                row.innerHTML = `
+                    <input type="number" min="1" value="${item.width}" data-k="width" aria-label="${isBoard ? '판재' : '조각'} ${index + 1} 가로">
+                    <input type="number" min="1" value="${item.height}" data-k="height" aria-label="${isBoard ? '판재' : '조각'} ${index + 1} 세로">
+                    <input type="number" min="1" value="${item.quantity}" data-k="quantity" aria-label="${isBoard ? '판재' : '조각'} ${index + 1} 수량">
+                    <button class="del" aria-label="${isBoard ? '판재' : '조각'} ${index + 1} 삭제">×</button>`;
+
+                row.querySelector('.del').onclick = () => {
+                    items.splice(index, 1);
+                    reset();
+                    render();
+                };
+
+                row.querySelectorAll('input').forEach(input => {
+                    input.oninput = () => {
+                        item[input.dataset.k] = input.value === '' ? '' : Number(input.value);
+                        reset();
+                        draw();
+                    };
+                });
+
+                rows.append(row);
+            });
+        }
+
+        function copies() {
+            return S.boards.flatMap(board =>
+                Array.from({ length: Number(board.quantity) || 0 }, (_, index) => ({ board, index }))
+            );
+        }
+
+        function usedCopies() {
+            const used = new Set(S.layout.map(placement =>
+                `${placement.board_id}:${placement.board_copy_index}`
+            ));
+            return copies().filter(({ board, index }) => used.has(`${board.id}:${index}`));
+        }
+
+        function current() {
+            return usedCopies()[S.board];
+        }
+
+        function render() {
+            renderList('boards');
+            renderList('pieces');
+            draw();
+        }
+
+        function reset() {
+            S.layout = [];
+            $('#usage').textContent = '— %';
+            $('#placed').textContent = '— 개';
+            $('#failed').textContent = '— 개';
+            $('#used').textContent = '— 장';
+            $('#alert').classList.remove('on');
+        }
+
+        function updateStatsIcon() {
+            const isClosed = $('#stats').classList.contains('closed');
+            $('#collapse').innerHTML = isClosed
+                ? '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>'
+                : '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>';
+        }
+
         function draw() {
-            let list = copies(); S.board = Math.min(S.board, Math.max(0, list.length - 1)); let c = current();
-            $('#boardnav').classList.toggle('on', list.length > 1); $('#bi').textContent = `${list.length ? S.board + 1 : 0} / ${list.length}`;
-            $('#pb').disabled = S.board <= 0; $('#nb').disabled = S.board >= list.length - 1; $('#ps').disabled = !S.steps.length || S.step <= 0; $('#ns').disabled = !S.steps.length || S.step >= S.steps.length - 1;
-            $('#boardtitle').textContent = c ? `판재 #${c.b.id} · ${c.b.width} × ${c.b.height} mm` : '원자재 판이 없습니다'; $('#dw').textContent = c ? c.b.width + ' mm' : '—'; $('#dh').textContent = c ? c.b.height + ' mm' : '—';
-            document.querySelectorAll('.piece').forEach(e => e.remove()); let live = c ? S.layout.filter(p => Number(p.board_id) === Number(c.b.id) && Number(p.board_copy_index || 0) === Number(c.i)) : []; $('#empty').style.display = live.length ? 'none' : 'grid';
-            live.forEach(p => { let it = S.pieces.find(v => Number(v.id) === Number(p.piece_id)); if (!it) return; let rot = Boolean(p.piece_rotated), w = Number(p.width) || (rot ? Number(it.height) : Number(it.width)), h = Number(p.height) || (rot ? Number(it.width) : Number(it.height)); let el = document.createElement('div'); el.className = 'piece'; el.style.cssText = `left:${Number(p.x) / Number(c.b.width) * 100}%;top:${Number(p.y) / Number(c.b.height) * 100}%;width:${w / Number(c.b.width) * 100}%;height:${h / Number(c.b.height) * 100}%;background:${colors[(Number(it.id) - 1) % colors.length]}`; el.innerHTML = `조각 #${esc(it.id)}<br>${w} × ${h}`; let active = S.steps[S.step]; if (active && active.piece_id != null && (Number(active.piece_id) !== Number(p.piece_id) || Number(active.piece_copy_index || 0) !== Number(p.piece_copy_index || 0))) el.style.opacity = '.3'; if (active && Number(active.piece_id) === Number(p.piece_id) && Number(active.piece_copy_index || 0) === Number(p.piece_copy_index || 0)) el.style.boxShadow = 'inset 0 0 0 3px white,0 0 0 2px #527b64'; $('#board').append(el) });
-            $('#collapse').innerHTML = $('#stats').classList.contains('closed') ? '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>' : '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>';
+            const boardCopies = usedCopies();
+            S.board = Math.min(S.board, Math.max(0, boardCopies.length - 1));
+            const selected = current();
+
+            $('#boardnav').classList.toggle('on', boardCopies.length > 1);
+            $('#bi').textContent = `${boardCopies.length ? S.board + 1 : 0} / ${boardCopies.length}`;
+            $('#pb').disabled = S.board <= 0;
+            $('#nb').disabled = S.board >= boardCopies.length - 1;
+            $('#boardtitle').textContent = selected
+                ? `판재 #${selected.board.id} · ${selected.board.width} × ${selected.board.height} mm`
+                : '원자재 판이 없습니다';
+            $('#dw').textContent = selected ? `${selected.board.width} mm` : '—';
+            $('#dh').textContent = selected ? `${selected.board.height} mm` : '—';
+
+            const boardElement = $('#board');
+            const stage = boardElement.parentElement;
+
+            if (selected && Number(selected.board.width) > 0 && Number(selected.board.height) > 0) {
+                const maxWidth = Math.min(stage.clientWidth - 24, 680);
+                const maxHeight = stage.clientHeight - 24;
+                const scale = Math.max(0, Math.min(
+                    maxWidth / Number(selected.board.width),
+                    maxHeight / Number(selected.board.height)
+                ));
+                boardElement.style.width = `${Number(selected.board.width) * scale}px`;
+                boardElement.style.height = `${Number(selected.board.height) * scale}px`;
+            } else {
+                boardElement.style.width = '';
+                boardElement.style.height = '';
+            }
+
+            boardElement.querySelectorAll('.piece').forEach(pieceElement => pieceElement.remove());
+            const placedPieces = selected
+                ? S.layout.filter(placement =>
+                    Number(placement.board_id) === Number(selected.board.id) &&
+                    Number(placement.board_copy_index || 0) === Number(selected.index)
+                )
+                : [];
+
+            $('#empty').style.display = placedPieces.length ? 'none' : 'grid';
+
+            placedPieces.forEach(placement => {
+                const piece = S.pieces.find(item => Number(item.id) === Number(placement.piece_id));
+                if (!piece) return;
+
+                const rotated = Boolean(placement.piece_rotated);
+                const width = Number(placement.width) || (rotated ? Number(piece.height) : Number(piece.width));
+                const height = Number(placement.height) || (rotated ? Number(piece.width) : Number(piece.height));
+                const element = document.createElement('div');
+                element.className = 'piece';
+                element.style.cssText = `
+                    left: ${Number(placement.x) / Number(selected.board.width) * 100}%;
+                    top: ${Number(placement.y) / Number(selected.board.height) * 100}%;
+                    width: ${width / Number(selected.board.width) * 100}%;
+                    height: ${height / Number(selected.board.height) * 100}%;
+                    background: ${colors[(Number(piece.id) - 1) % colors.length]};`;
+                element.textContent = `${width} × ${height}`;
+                boardElement.append(element);
+            });
+
+            updateStatsIcon();
         }
-        function validate() { let e = []; if (!S.boards.length) e.push('원자재 판이 최소 1개 필요합니다.'); if (!S.pieces.length) e.push('자를 조각이 최소 1개 필요합니다.'); for (let [name, arr] of [['원자재 판', S.boards], ['조각', S.pieces]]) arr.forEach((v, i) => ['width', 'height', 'quantity'].forEach(k => { if (!Number.isFinite(Number(v[k])) || Number(v[k]) <= 0) e.push(`${name} ${i + 1}의 ${k === 'width' ? '가로' : k === 'height' ? '세로' : '수량'}은 0보다 큰 숫자여야 합니다.`) })); if ([...S.boards, ...S.pieces].some(v => Number(v.quantity) > 1000)) e.push('한 항목의 수량은 1,000개 이하여야 합니다.'); if (S.boards.length && S.pieces.length && !$('#rotation').checked && S.pieces.every(p => S.boards.every(b => p.width > b.width || p.height > b.height))) e.push('회전이 꺼져 있고 어떤 조각도 판재에 들어갈 수 없습니다. 치수나 회전 옵션을 확인하세요.'); return e }
-        function defaultSteps(layout) { return layout.map((p, i) => ({ type: 'place', axis: null, position: null, from: null, to: null, piece_id: p.piece_id, piece_copy_index: p.piece_copy_index, board_id: p.board_id, label: `${i + 1}단계 · 조각 #${p.piece_id} 배치` })) }
-window.optimizePlacement = (boards, pieces, options) => findInitialLayout(boards, pieces, { allow_rotation: options.allowRotation });
-async function run() {
-    let errors = validate();
-    if (errors.length) { $('#alert').innerHTML = errors.map(esc).join('<br>'); $('#alert').classList.add('on'); return }
-    $('#alert').classList.remove('on'); $('#run').disabled = true; $('#run').textContent = '계산 중…';
-    try {
-        const boardInputs = [], pieceInputs = [], boardInstances = new Map(), pieceInstances = new Map();
-        let boardInstanceId = 1, pieceInstanceId = 1;
-        for (const b of S.boards) for (let copy = 0; copy < Number(b.quantity); copy++) {
-            const id = boardInstanceId++;
-            boardInputs.push({ id, width: Number(b.width), height: Number(b.height), quantity: 1 });
-            boardInstances.set(id, { board_id: b.id, board_copy_index: copy });
+
+        function validate() {
+            const errors = [];
+
+            if (!S.boards.length) errors.push('원자재 판이 최소 1개 필요합니다.');
+            if (!S.pieces.length) errors.push('자를 조각이 최소 1개 필요합니다.');
+
+            for (const [name, items] of [['원자재 판', S.boards], ['조각', S.pieces]]) {
+                items.forEach((item, index) => {
+                    for (const key of ['width', 'height', 'quantity']) {
+                        if (!Number.isFinite(Number(item[key])) || Number(item[key]) <= 0) {
+                            const label = key === 'width' ? '가로' : key === 'height' ? '세로' : '수량';
+                            errors.push(`${name} ${index + 1}의 ${label}은 0보다 큰 숫자여야 합니다.`);
+                        }
+                    }
+                });
+            }
+
+            if ([...S.boards, ...S.pieces].some(item => Number(item.quantity) > 1000)) {
+                errors.push('한 항목의 수량은 1,000개 이하여야 합니다.');
+            }
+
+            const kerf = Number($('#kerf').value);
+            if (!Number.isFinite(kerf) || kerf < 0) {
+                errors.push('톱날 두께는 0 이상의 숫자여야 합니다.');
+            }
+
+            const edgeMargin = Number($('#edgeMargin').value);
+            if (!Number.isFinite(edgeMargin) || edgeMargin < 0) {
+                errors.push('판 가장자리 여유는 0 이상의 숫자여야 합니다.');
+            }
+            if (S.boards.some(board => edgeMargin * 2 >= Number(board.width) || edgeMargin * 2 >= Number(board.height))) {
+                errors.push('판 가장자리 여유는 원자재 판 가로·세로의 절반보다 작아야 합니다.');
+            }
+
+            if (S.boards.length && S.pieces.length && !$('#rotation').checked &&
+                S.pieces.every(piece => S.boards.every(board =>
+                    piece.width > board.width || piece.height > board.height
+                ))) {
+                errors.push('회전이 꺼져 있고 어떤 조각도 판재에 들어갈 수 없습니다. 치수나 회전 옵션을 확인하세요.');
+            }
+
+            return errors;
         }
-        for (const p of S.pieces) for (let copy = 0; copy < Number(p.quantity); copy++) {
-            const id = pieceInstanceId++;
-            pieceInputs.push({ id, width: Number(p.width), height: Number(p.height), quantity: 1 });
-            pieceInstances.set(id, { piece_id: p.id, piece_copy_index: copy });
-        }
-        const result = await window.optimizePlacement(boardInputs, pieceInputs, { allowRotation: $('#rotation').checked });
-        if (!Array.isArray(result)) throw Error('배치 함수가 결과 배열을 반환하지 않았습니다.');
-        S.layout = result.map(p => {
-            const board = boardInstances.get(Number(p.board_id)), piece = pieceInstances.get(Number(p.piece_id));
-            if (!board || !piece) throw Error('배치 결과의 board_id 또는 piece_id가 입력과 일치하지 않습니다.');
-            return { ...p, ...board, ...piece, piece_rotated: Boolean(p.piece_rotated ?? p.rotation ?? p.rotated) };
+
+        window.optimizePlacement = (boards, pieces, options) => findInitialLayout(boards, pieces, {
+            allow_rotation: options.allowRotation,
+            kerf: options.kerf,
+            edge_margin: options.edgeMargin
         });
-        S.steps = defaultSteps(S.layout); S.board = 0; S.step = 0;
-        const placedArea = S.layout.reduce((sum, p) => { const piece = S.pieces.find(v => String(v.id) === String(p.piece_id)); return sum + (piece ? Number(piece.width) * Number(piece.height) : 0) }, 0);
-        const used = new Set(S.layout.map(p => `${p.board_id}:${p.board_copy_index}`));
-        const boardArea = Array.from(used).reduce((sum, key) => { const id = key.split(':')[0], board = S.boards.find(v => String(v.id) === id); return sum + (board ? Number(board.width) * Number(board.height) : 0) }, 0);
-        $('#usage').textContent = (boardArea ? Math.round(placedArea / boardArea * 100) : 0) + ' %';
-        $('#placed').textContent = S.layout.length + ' 개'; $('#failed').textContent = Math.max(0, pieceInputs.length - S.layout.length) + ' 개'; $('#used').textContent = used.size + ' 장';
-        draw();
-        if (!S.layout.length) { $('#alert').textContent = '조각이 배치되지 않았습니다. 크기와 판재 수량을 확인하세요.'; $('#alert').classList.add('on') }
-    } catch (e) { $('#alert').textContent = '계산 오류: ' + (e.message || e); $('#alert').classList.add('on') }
-    finally { $('#run').disabled = false; $('#run').textContent = '✦　최적화된 자르기 실행' }
-}$('#addb').onclick = () => { S.boards.push({ id: bid++, width: 2400, height: 1200, quantity: 1 }); reset(); render() }; $('#addp').onclick = () => { S.pieces.push({ id: pid++, width: 500, height: 300, quantity: 1 }); reset(); render() }; $('#run').onclick = run; $('#pb').onclick = () => { S.board = Math.max(0, S.board - 1); draw() }; $('#nb').onclick = () => { S.board = Math.min(copies().length - 1, S.board + 1); draw() }; function move(n) { S.step = Math.max(0, Math.min(S.steps.length - 1, S.step + n)); let b = $('#board'); b.style.transform = n > 0 ? 'translateX(-20px)' : 'translateX(20px)'; setTimeout(() => { b.style.transform = ''; draw() }, 120) } $('#ps').onclick = () => move(-1); $('#ns').onclick = () => move(1); $('#collapse').onclick = () => { $('#stats').classList.toggle('closed'); draw() }; $('#theme').onchange = e => { let t = { warm: ['#f8f7f1', '#fffefa', '#527b64', '#e9f0e9'], cool: ['#f3f6f8', '#fff', '#587b8b', '#e8f0f3'], sage: ['#f2f5ef', '#fbfff8', '#64806b', '#e8f0e5'] }[e.target.value];['--bg', '--panel', '--accent', '--soft'].forEach((k, i) => document.documentElement.style.setProperty(k, t[i])) }; render();
+
+        async function run() {
+            const errors = validate();
+            if (errors.length) {
+                $('#alert').innerHTML = errors.map(esc).join('<br>');
+                $('#alert').classList.add('on');
+                return;
+            }
+
+            $('#alert').classList.remove('on');
+            $('#run').disabled = true;
+            $('#run').textContent = '계산 중…';
+
+            try {
+                const boardInputs = [];
+                const pieceInputs = [];
+                const boardInstances = new Map();
+                const pieceInstances = new Map();
+                let boardInstanceId = 1;
+                let pieceInstanceId = 1;
+
+                for (const board of S.boards) {
+                    for (let copy = 0; copy < Number(board.quantity); copy++) {
+                        const id = boardInstanceId++;
+                        boardInputs.push({
+                            id,
+                            width: Number(board.width),
+                            height: Number(board.height),
+                            quantity: 1
+                        });
+                        boardInstances.set(id, { board_id: board.id, board_copy_index: copy });
+                    }
+                }
+
+                for (const piece of S.pieces) {
+                    for (let copy = 0; copy < Number(piece.quantity); copy++) {
+                        const id = pieceInstanceId++;
+                        pieceInputs.push({
+                            id,
+                            width: Number(piece.width),
+                            height: Number(piece.height),
+                            quantity: 1
+                        });
+                        pieceInstances.set(id, { piece_id: piece.id, piece_copy_index: copy });
+                    }
+                }
+
+                const result = await window.optimizePlacement(boardInputs, pieceInputs, {
+                    allowRotation: $('#rotation').checked,
+                    kerf: Number($('#kerf').value),
+                    edgeMargin: Number($('#edgeMargin').value)
+                });
+                if (!Array.isArray(result)) throw Error('배치 함수가 결과 배열을 반환하지 않았습니다.');
+
+                S.layout = result.map(placement => {
+                    const board = boardInstances.get(Number(placement.board_id));
+                    const piece = pieceInstances.get(Number(placement.piece_id));
+                    if (!board || !piece) {
+                        throw Error('배치 결과의 board_id 또는 piece_id가 입력과 일치하지 않습니다.');
+                    }
+                    return {
+                        ...placement,
+                        ...board,
+                        ...piece,
+                        piece_rotated: Boolean(placement.piece_rotated ?? placement.rotation ?? placement.rotated)
+                    };
+                });
+
+                S.board = 0;
+                const placedArea = S.layout.reduce((sum, placement) => {
+                    const piece = S.pieces.find(item => String(item.id) === String(placement.piece_id));
+                    return sum + (piece ? Number(piece.width) * Number(piece.height) : 0);
+                }, 0);
+                const usedBoards = new Set(S.layout.map(placement => `${placement.board_id}:${placement.board_copy_index}`));
+                const boardArea = Array.from(usedBoards).reduce((sum, key) => {
+                    const boardId = key.split(':')[0];
+                    const board = S.boards.find(item => String(item.id) === boardId);
+                    return sum + (board ? Number(board.width) * Number(board.height) : 0);
+                }, 0);
+
+                $('#usage').textContent = `${boardArea ? Math.round(placedArea / boardArea * 100) : 0} %`;
+                $('#placed').textContent = `${S.layout.length} 개`;
+                $('#failed').textContent = `${Math.max(0, pieceInputs.length - S.layout.length)} 개`;
+                $('#used').textContent = `${usedBoards.size} 장`;
+
+                draw();
+                if (!S.layout.length) {
+                    $('#alert').textContent = '조각이 배치되지 않았습니다. 크기와 판재 수량을 확인하세요.';
+                    $('#alert').classList.add('on');
+                }
+            } catch (error) {
+                $('#alert').textContent = `계산 오류: ${error.message || error}`;
+                $('#alert').classList.add('on');
+            } finally {
+                $('#run').disabled = false;
+                $('#run').textContent = '✦　최적화된 자르기 실행';
+            }
+        }
+
+        $('#addb').onclick = () => {
+            S.boards.push({ id: bid++, width: 2400, height: 1200, quantity: 1 });
+            reset();
+            render();
+        };
+
+        $('#addp').onclick = () => {
+            S.pieces.push({ id: pid++, width: 500, height: 300, quantity: 1 });
+            reset();
+            render();
+        };
+
+        $('#run').onclick = run;
+        $('#pb').onclick = () => {
+            S.board = Math.max(0, S.board - 1);
+            draw();
+        };
+        $('#nb').onclick = () => {
+            S.board = Math.min(usedCopies().length - 1, S.board + 1);
+            draw();
+        };
+
+
+        $('#collapse').onclick = () => {
+            $('#stats').classList.toggle('closed');
+            updateStatsIcon();
+        };
+
+        $('#theme').onchange = event => {
+            const themes = {
+                warm: ['#f8f7f1', '#fffefa', '#527b64', '#e9f0e9'],
+                cool: ['#f3f6f8', '#fff', '#587b8b', '#e8f0f3'],
+                sage: ['#f2f5ef', '#fbfff8', '#64806b', '#e8f0e5']
+            };
+            const theme = themes[event.target.value];
+            ['--bg', '--panel', '--accent', '--soft'].forEach((property, index) => {
+                document.documentElement.style.setProperty(property, theme[index]);
+            });
+        };
+
+        window.addEventListener('resize', draw);
+        render();
+
     </script>
 </body>
 
