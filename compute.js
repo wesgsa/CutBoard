@@ -1,3 +1,4 @@
+
 function createBoardSpaces(boards, edgeMargin = 0) {
     return boards.flatMap((board, boardKey) => {
         const width = Number(board.width);
@@ -13,6 +14,7 @@ function createBoardSpaces(boards, edgeMargin = 0) {
         }];
     });
 }
+
 function findBestPlacement(piece, spaces, allowRotation) {
     let best = null;
 
@@ -85,8 +87,12 @@ function containsRectangle(container, candidate) {
 
 function removeContainedSpaces(spaces) {
     const spacesByBoard = new Map();
+
     for (const space of spaces) {
-        if (!spacesByBoard.has(space.board_key)) spacesByBoard.set(space.board_key, []);
+        if (!spacesByBoard.has(space.board_key)) {
+            spacesByBoard.set(space.board_key, []);
+        }
+        
         spacesByBoard.get(space.board_key).push(space);
     }
 
@@ -119,28 +125,32 @@ function makePlacement(space, piece, candidate) {
 
 function findInitialLayout(boards, pieces, options = {}) {
     const allowRotation = Boolean(options.allow_rotation);
-    const kerf = Math.max(0, Number(options.kerf) || 0);
-    const edgeMargin = Math.max(0, Number(options.edge_margin) || 0);
-    const boardByKey = new Map(boards.map((board, index) => [index, board]));
-    let spaces = createBoardSpaces(boards, edgeMargin);
-    const sortedPieces = [...pieces].sort((a, b) => Number(b.width) * Number(b.height) - Number(a.width) * Number(a.height));
-    const layout = [];
+    const kerf          = Math.max(0, Number(options.kerf) || 0);
+    const edgeMargin    = Math.max(0, Number(options.edge_margin) || 0);
+    const boardByKey    = new Map(boards.map((board, index) => [index, board]));
+
+    let spaces          = createBoardSpaces(boards, edgeMargin);
+    const sortedPieces  = [...pieces].sort((a, b) => Number(b.width) * Number(b.height) - Number(a.width) * Number(a.height));
+    const layout        = [];
 
     for (const piece of sortedPieces) {
         const candidate = findBestPlacement(piece, spaces, allowRotation);
-        if (!candidate) continue;
+        
+        if (!candidate) {
+            continue;
+        }
 
         const space = spaces[candidate.spaceIndex];
         const board = boardByKey.get(space.board_key);
         const pieceRect = {
-            left: space.left,
-            right: space.left + candidate.width,
-            top: space.top,
-            bottom: space.top + candidate.height
+            left: space.left, right: space.left + candidate.width,
+             top: space.top, bottom: space.top + candidate.height
         };
 
         layout.push(makePlacement(space, piece, candidate));
+
         const clearanceRect = createClearanceRect(pieceRect, board, kerf);
+        
         spaces = splitSpacesForPlacement(spaces, clearanceRect, space.board_key);
         spaces = removeContainedSpaces(spaces);
     }
