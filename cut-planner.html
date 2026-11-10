@@ -1,5 +1,4 @@
-<!doctype
-    <!doctype html>
+<!doctype html>
 <html lang="ko">
 
 <head>
@@ -284,6 +283,86 @@
 
         .stats.closed .stats-body {
             display: none
+        }
+
+        .comparison {
+            display: none;
+            margin-top: 15px;
+            padding: 16px
+        }
+
+        .comparison.on {
+            display: block
+        }
+
+        .comparison-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 12px;
+            font-weight: 700
+        }
+
+        .comparison-title small {
+            color: var(--muted);
+            font-size: 9px;
+            font-weight: 400
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px
+        }
+
+        .comparison-card {
+            border: 1px solid var(--line);
+            border-radius: 11px;
+            padding: 12px
+        }
+
+        .comparison-card header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            margin-bottom: 10px;
+            font-size: 11px;
+            font-weight: 700
+        }
+
+        .comparison-card button {
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            background: white;
+            padding: 5px 7px;
+            color: var(--accent);
+            font-size: 9px;
+            cursor: pointer
+        }
+
+        .comparison-values {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 7px;
+            color: var(--muted);
+            font-size: 9px
+        }
+
+        .comparison-values strong {
+            display: block;
+            margin-top: 3px;
+            color: var(--ink);
+            font-size: 13px
+        }
+
+        .run.secondary {
+            margin-top: 8px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+            color: var(--accent);
+            padding: 10px
         }
 
         .stat {
@@ -645,6 +724,34 @@
                         </div>
                     </div>
                 </section>
+                <section class="card comparison" id="comparison">
+                    <div class="comparison-title">
+                        <span>알고리즘 비교</span>
+                        <small id="comparisonTime"></small>
+                    </div>
+                    <div class="comparison-grid">
+                        <article class="comparison-card">
+                            <header>기존 MaxRects <button id="viewMaxRects">배치도 보기</button></header>
+                            <div class="comparison-values">
+                                <div>배치 조각<strong id="maxPlaced">—</strong></div>
+                                <div>실패 조각<strong id="maxFailed">—</strong></div>
+                                <div>사용 판재<strong id="maxBoards">—</strong></div>
+                                <div>자재 사용률<strong id="maxUsage">—</strong></div>
+                                <div>계산 시간<strong id="maxTime">—</strong></div>
+                            </div>
+                        </article>
+                        <article class="comparison-card">
+                            <header>새 알고리즘 <button id="viewOpt">배치도 보기</button></header>
+                            <div class="comparison-values">
+                                <div>배치 조각<strong id="optPlaced">—</strong></div>
+                                <div>실패 조각<strong id="optFailed">—</strong></div>
+                                <div>사용 판재<strong id="optBoards">—</strong></div>
+                                <div>자재 사용률<strong id="optUsage">—</strong></div>
+                                <div>계산 시간<strong id="optTime">—</strong></div>
+                            </div>
+                        </article>
+                    </div>
+                </section>
             </main>
             <aside class="side">
                 <div class="scroll">
@@ -684,11 +791,13 @@
                 <div class="dock">
                     <div class="alert" id="alert" role="alert"></div>
                     <button class="run" id="run">✦　최적화된 자르기 실행</button>
+                    <button class="run secondary" id="compareRun">기존 방식과 비교</button>
                 </div>
             </aside>
         </div>
     </div>
     <script src="./compute.js"></script>
+    <script src="./optimize.js"></script>
     <script>
         const S = {
             boards: [],
@@ -697,7 +806,8 @@
                 { id: 2, width: 600, height: 400, quantity: 1 }
             ],
             layout: [],
-            board: 0
+            board: 0,
+            comparison: null
         };
 
         let bid = 1;
@@ -781,6 +891,8 @@
 
         function reset() {
             S.layout = [];
+            S.comparison = null;
+            $('#comparison').classList.remove('on');
             $('#usage').textContent = '— %';
             $('#placed').textContent = '— 개';
             $('#failed').textContent = '— 개';
@@ -903,11 +1015,112 @@
             return errors;
         }
 
-        window.optimizePlacement = (boards, pieces, options) => findInitialLayout(boards, pieces, {
+        window.optimizePlacement = (boards, pieces, options) => OptimizePlacement3(boards, pieces, {
             allow_rotation: options.allowRotation,
             kerf: options.kerf,
             edge_margin: options.edgeMargin
         });
+
+        function createOptimizerInputs() {
+            const boardInputs = [];
+            const pieceInputs = [];
+            const boardInstances = new Map();
+            const pieceInstances = new Map();
+            let boardInstanceId = 1;
+            let pieceInstanceId = 1;
+
+            for (const board of S.boards) {
+                for (let copy = 0; copy < Number(board.quantity); copy++) {
+                    const id = boardInstanceId++;
+                    boardInputs.push({
+                        id,
+                        width: Number(board.width),
+                        height: Number(board.height),
+                        quantity: 1
+                    });
+                    boardInstances.set(id, { board_id: board.id, board_copy_index: copy });
+                }
+            }
+
+            for (const piece of S.pieces) {
+                for (let copy = 0; copy < Number(piece.quantity); copy++) {
+                    const id = pieceInstanceId++;
+                    pieceInputs.push({
+                        id,
+                        width: Number(piece.width),
+                        height: Number(piece.height),
+                        quantity: 1
+                    });
+                    pieceInstances.set(id, { piece_id: piece.id, piece_copy_index: copy });
+                }
+            }
+
+            return { boardInputs, pieceInputs, boardInstances, pieceInstances };
+        }
+
+        function mapOptimizerLayout(result, inputs) {
+            if (!Array.isArray(result)) throw Error('배치 함수가 결과 배열을 반환하지 않았습니다.');
+
+            return result.map(placement => {
+                const board = inputs.boardInstances.get(Number(placement.board_id));
+                const piece = inputs.pieceInstances.get(Number(placement.piece_id));
+                if (!board || !piece) {
+                    throw Error('배치 결과의 board_id 또는 piece_id가 입력과 일치하지 않습니다.');
+                }
+
+                return {
+                    ...placement,
+                    ...board,
+                    ...piece,
+                    piece_rotated: Boolean(placement.piece_rotated ?? placement.rotation ?? placement.rotated)
+                };
+            });
+        }
+
+        function summarizeLayout(layout, totalPieceCount) {
+            const usedBoards = new Set(layout.map(placement =>
+                `${placement.board_id}:${placement.board_copy_index}`
+            ));
+            const placedArea = layout.reduce((sum, placement) => {
+                const piece = S.pieces.find(item => String(item.id) === String(placement.piece_id));
+                return sum + (piece ? Number(piece.width) * Number(piece.height) : 0);
+            }, 0);
+            const boardArea = Array.from(usedBoards).reduce((sum, key) => {
+                const boardId = key.split(':')[0];
+                const board = S.boards.find(item => String(item.id) === boardId);
+                return sum + (board ? Number(board.width) * Number(board.height) : 0);
+            }, 0);
+
+            return {
+                usage: boardArea ? Math.round(placedArea / boardArea * 100) : 0,
+                placed: layout.length,
+                failed: Math.max(0, totalPieceCount - layout.length),
+                used: usedBoards.size
+            };
+        }
+
+        function showLayoutStats(summary) {
+            $('#usage').textContent = `${summary.usage} %`;
+            $('#placed').textContent = `${summary.placed} 개`;
+            $('#failed').textContent = `${summary.failed} 개`;
+            $('#used').textContent = `${summary.used} 장`;
+        }
+
+        function showComparisonLayout(algorithm) {
+            const result = S.comparison[algorithm];
+            S.layout = result.layout;
+            S.board = 0;
+            showLayoutStats(result.summary);
+            draw();
+        }
+
+        function fillComparisonCard(prefix, result) {
+            $(`#${prefix}Placed`).textContent = `${result.summary.placed} 개`;
+            $(`#${prefix}Failed`).textContent = `${result.summary.failed} 개`;
+            $(`#${prefix}Boards`).textContent = `${result.summary.used} 장`;
+            $(`#${prefix}Usage`).textContent = `${result.summary.usage} %`;
+            $(`#${prefix}Time`).textContent = `${result.elapsed.toFixed(1)} ms`;
+        }
 
         async function run() {
             const errors = validate();
@@ -918,82 +1131,29 @@
             }
 
             $('#alert').classList.remove('on');
+            S.comparison = null;
+            $('#comparison').classList.remove('on');
             $('#run').disabled = true;
+            $('#compareRun').disabled = true;
             $('#run').textContent = '계산 중…';
 
             try {
-                const boardInputs = [];
-                const pieceInputs = [];
-                const boardInstances = new Map();
-                const pieceInstances = new Map();
-                let boardInstanceId = 1;
-                let pieceInstanceId = 1;
-
-                for (const board of S.boards) {
-                    for (let copy = 0; copy < Number(board.quantity); copy++) {
-                        const id = boardInstanceId++;
-                        boardInputs.push({
-                            id,
-                            width: Number(board.width),
-                            height: Number(board.height),
-                            quantity: 1
-                        });
-                        boardInstances.set(id, { board_id: board.id, board_copy_index: copy });
-                    }
-                }
-
-                for (const piece of S.pieces) {
-                    for (let copy = 0; copy < Number(piece.quantity); copy++) {
-                        const id = pieceInstanceId++;
-                        pieceInputs.push({
-                            id,
-                            width: Number(piece.width),
-                            height: Number(piece.height),
-                            quantity: 1
-                        });
-                        pieceInstances.set(id, { piece_id: piece.id, piece_copy_index: copy });
-                    }
-                }
-
-                const result = await window.optimizePlacement(boardInputs, pieceInputs, {
+                const inputs = createOptimizerInputs();
+                const started = performance.now();
+                const result = await window.optimizePlacement(inputs.boardInputs, inputs.pieceInputs, {
                     allowRotation: $('#rotation').checked,
                     kerf: Number($('#kerf').value),
                     edgeMargin: Number($('#edgeMargin').value)
                 });
-                if (!Array.isArray(result)) throw Error('배치 함수가 결과 배열을 반환하지 않았습니다.');
-
-                S.layout = result.map(placement => {
-                    const board = boardInstances.get(Number(placement.board_id));
-                    const piece = pieceInstances.get(Number(placement.piece_id));
-                    if (!board || !piece) {
-                        throw Error('배치 결과의 board_id 또는 piece_id가 입력과 일치하지 않습니다.');
-                    }
-                    return {
-                        ...placement,
-                        ...board,
-                        ...piece,
-                        piece_rotated: Boolean(placement.piece_rotated ?? placement.rotation ?? placement.rotated)
-                    };
-                });
+                const elapsed = performance.now() - started;
+                S.layout = mapOptimizerLayout(result, inputs);
 
                 S.board = 0;
-                const placedArea = S.layout.reduce((sum, placement) => {
-                    const piece = S.pieces.find(item => String(item.id) === String(placement.piece_id));
-                    return sum + (piece ? Number(piece.width) * Number(piece.height) : 0);
-                }, 0);
-                const usedBoards = new Set(S.layout.map(placement => `${placement.board_id}:${placement.board_copy_index}`));
-                const boardArea = Array.from(usedBoards).reduce((sum, key) => {
-                    const boardId = key.split(':')[0];
-                    const board = S.boards.find(item => String(item.id) === boardId);
-                    return sum + (board ? Number(board.width) * Number(board.height) : 0);
-                }, 0);
-
-                $('#usage').textContent = `${boardArea ? Math.round(placedArea / boardArea * 100) : 0} %`;
-                $('#placed').textContent = `${S.layout.length} 개`;
-                $('#failed').textContent = `${Math.max(0, pieceInputs.length - S.layout.length)} 개`;
-                $('#used').textContent = `${usedBoards.size} 장`;
+                showLayoutStats(summarizeLayout(S.layout, inputs.pieceInputs.length));
 
                 draw();
+                $('#alert').textContent = `계산 완료 · ${elapsed.toFixed(1)} ms`;
+                $('#alert').classList.add('on');
                 if (!S.layout.length) {
                     $('#alert').textContent = '조각이 배치되지 않았습니다. 크기와 판재 수량을 확인하세요.';
                     $('#alert').classList.add('on');
@@ -1003,7 +1163,72 @@
                 $('#alert').classList.add('on');
             } finally {
                 $('#run').disabled = false;
+                $('#compareRun').disabled = false;
                 $('#run').textContent = '✦　최적화된 자르기 실행';
+            }
+        }
+
+        async function compareAlgorithms() {
+            const errors = validate();
+            if (errors.length) {
+                $('#alert').innerHTML = errors.map(esc).join('<br>');
+                $('#alert').classList.add('on');
+                return;
+            }
+
+            $('#alert').classList.remove('on');
+            $('#run').disabled = true;
+            $('#compareRun').disabled = true;
+            $('#compareRun').textContent = '두 방식 계산 중…';
+
+            try {
+                const inputs = createOptimizerInputs();
+                const options = {
+                    allow_rotation: $('#rotation').checked,
+                    kerf: Number($('#kerf').value),
+                    edge_margin: Number($('#edgeMargin').value)
+                };
+
+                let started = performance.now();
+                const maxRectsResult = OptimizePlacement(inputs.boardInputs, inputs.pieceInputs, options);
+                const maxRectsElapsed = performance.now() - started;
+
+                started = performance.now();
+                const optResult = OptimizePlacement3(inputs.boardInputs, inputs.pieceInputs, options);
+                const optElapsed = performance.now() - started;
+
+                const maxRectsLayout = mapOptimizerLayout(maxRectsResult, inputs);
+                const optLayout = mapOptimizerLayout(optResult, inputs);
+                const totalPieces = inputs.pieceInputs.length;
+
+                S.comparison = {
+                    maxRects: {
+                        layout: maxRectsLayout,
+                        summary: summarizeLayout(maxRectsLayout, totalPieces),
+                        elapsed: maxRectsElapsed
+                    },
+                    opt: {
+                        layout: optLayout,
+                        summary: summarizeLayout(optLayout, totalPieces),
+                        elapsed: optElapsed
+                    }
+                };
+
+                fillComparisonCard('max', S.comparison.maxRects);
+                fillComparisonCard('opt', S.comparison.opt);
+                $('#comparisonTime').textContent = `총 ${ (maxRectsElapsed + optElapsed).toFixed(1) } ms`;
+                $('#comparison').classList.add('on');
+                showComparisonLayout('opt');
+
+                $('#alert').textContent = '비교 계산 완료 · 카드의 “배치도 보기”로 각 결과를 확인하세요.';
+                $('#alert').classList.add('on');
+            } catch (error) {
+                $('#alert').textContent = `비교 계산 오류: ${error.message || error}`;
+                $('#alert').classList.add('on');
+            } finally {
+                $('#run').disabled = false;
+                $('#compareRun').disabled = false;
+                $('#compareRun').textContent = '기존 방식과 비교';
             }
         }
 
@@ -1020,6 +1245,9 @@
         };
 
         $('#run').onclick = run;
+        $('#compareRun').onclick = compareAlgorithms;
+        $('#viewMaxRects').onclick = () => showComparisonLayout('maxRects');
+        $('#viewOpt').onclick = () => showComparisonLayout('opt');
         $('#pb').onclick = () => {
             S.board = Math.max(0, S.board - 1);
             draw();

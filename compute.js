@@ -1,4 +1,3 @@
-
 function createBoardSpaces(boards, edgeMargin = 0) {
     return boards.flatMap((board, boardKey) => {
         const width = Number(board.width);
@@ -46,12 +45,13 @@ function rectanglesIntersect(a, b) {
 }
 
 function createClearanceRect(pieceRect, board, kerf) {
-    const halfKerf = kerf / 2;
+    // 다음 조각은 이 영역의 바깥 경계에 붙여 놓이므로, 조각 사이 간격이 kerf가 되려면
+    // 조각 사방으로 kerf 전체를 비워 둬야 한다. (kerf / 2 로 하면 간격이 kerf / 2 밖에 안 남는다)
     return {
-        left: Math.max(0, pieceRect.left - halfKerf),
-        right: Math.min(Number(board.width), pieceRect.right + halfKerf),
-        top: Math.max(0, pieceRect.top - halfKerf),
-        bottom: Math.min(Number(board.height), pieceRect.bottom + halfKerf)
+        left: Math.max(0, pieceRect.left - kerf),
+        right: Math.min(Number(board.width), pieceRect.right + kerf),
+        top: Math.max(0, pieceRect.top - kerf),
+        bottom: Math.min(Number(board.height), pieceRect.bottom + kerf)
     };
 }
 
