@@ -739,7 +739,7 @@
                     <input type="number" min="1" value="${item.width}" data-k="width" aria-label="${isBoard ? '판재' : '조각'} ${index + 1} 가로">
                     <input type="number" min="1" value="${item.height}" data-k="height" aria-label="${isBoard ? '판재' : '조각'} ${index + 1} 세로">
                     <input type="number" min="1" value="${item.quantity}" data-k="quantity" aria-label="${isBoard ? '판재' : '조각'} ${index + 1} 수량">
-                    <button clas    s="del" aria-label="${isBoard ? '판재' : '조각'} ${index + 1} 삭제">×</button>`;
+                    <button class="del" aria-label="${isBoard ? '판재' : '조각'} ${index + 1} 삭제">×</button>`;
 
                 row.querySelector('.del').onclick = () => {
                     items.splice(index, 1);
