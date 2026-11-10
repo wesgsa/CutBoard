@@ -4,18 +4,25 @@
 // 입력 / 출력 형식은 OptimizePlacement(compute.js), OptimizePlacement2(bin-packing-search.js)와 같습니다.
 //
 // 구성
-//   1) 디코더      : MaxRects(최대 빈 사각형) 배치기. "조각 순서 + 몇 가지 선택 규칙"을 받아 배치 1개를 만든다.
+//   1) 디코더      : "조각 순서 + 몇 가지 선택 규칙"을 받아 배치 1개를 만드는 빠른 배치기.
+//                    - 기본        : MaxRects(최대 빈 사각형). 빈 공간끼리 겹칠 수 있어 가장 촘촘하게 채운다.
+//                    - guillotine  : 빈 공간을 서로 겹치지 않는 사각형으로 쪼개며 쓴다. 결과는 항상
+//                                    "판의 한쪽 끝에서 반대쪽 끝까지 직선으로 자르는 순서"로 만들 수 있다.
 //                    노드를 복사하지 않고 빈 공간 목록 하나만 갱신하므로 한 번 디코딩하는 데 아주 짧게 걸린다.
 //   2) 다중 시작   : 정렬 기준 x 배치 규칙 조합으로 해를 여러 개 만들고 가장 좋은 것을 고른다.
 //   3) 반복 지역 탐색(ILS) : 가장 좋은 해의 조각 순서를 조금씩 바꿔 다시 디코딩하며 개선한다.
-//                    판재를 더 적게 쓰는 방향, 마지막 판재를 최대한 비우는 방향으로 탐색한다.
 //
 // 톱날 두께(kerf) 처리 : 모든 조각과 판재를 kerf만큼 키워서 배치하면 조각 사이 간격이 정확히 kerf가 되고
 //                        판재 가장자리에는 여분이 생기지 않는다. (조각 w -> w+kerf, 판재 W -> W+kerf)
 //
-// 목표(우선순위 순) : 1) 배치된 넓이 최대  2) 사용 판재 넓이 최소  3) 판재별 채움을 한쪽으로 몰아 남는 판재를 크게
+// 목표(우선순위 순)
+//   1) 배치된 넓이 최대          (못 넣는 조각을 최소로)
+//   2) 사용 판재 넓이 최소        (판을 최소로)
+//   3) 자투리 집중               (판마다 "가장 큰 연속 빈 사각형"의 넓이 제곱 합이 큰 쪽 = 쓸 만한 자투리를 한 덩어리로)
+//   4) 회전한 조각 수 최소
 //
 // options : allow_rotation, kerf, edge_margin   (기존과 동일)
+//           guillotine      true면 직선 절단(길로틴)으로 만들 수 있는 배치만 만든다. (기본 false)
 //           time_limit_ms   탐색 시간 상한(기본 350)
 //           max_iterations  탐색 반복 횟수 상한(기본 제한 없음)
 //           seed            난수 시드(기본: 입력으로부터 계산, 같은 입력이면 같은 시드)
@@ -24,7 +31,8 @@ var OptimizePlacement3 = (function () {
     'use strict';
 
     const EPS = 1e-7;
-    const HEURISTIC_COUNT = 5;   // 0 BSSF, 1 BLSF, 2 BAF, 3 위-왼쪽 우선, 4 접촉점(Contact Point)
+    const HEURISTIC_COUNT = 6;   // 0 BSSF, 1 BLSF, 2 BAF, 3 위-왼쪽 우선, 4 접촉점(Contact Point), 5 BSSF(동점이면 먼저 찾은 자리)
+    const SPLIT_COUNT = 6;       // 길로틴 분할 규칙 : 0 남는 변이 짧은 쪽, 1 긴 쪽, 2 최소 넓이, 3 최대 넓이, 4 빈 공간의 짧은 변, 5 긴 변
 
     function nowMs() {
         return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
@@ -97,7 +105,10 @@ var OptimizePlacement3 = (function () {
             }
         }
 
-        return { bins: bins, items: items, kerf: kerf, margin: margin, allowRotation: allowRotation };
+        return {
+            bins: bins, items: items, kerf: kerf, margin: margin, allowRotation: allowRotation,
+            guillotine: Boolean(options.guillotine)
+        };
     }
 
     // ------------------------------------------------------------------ 해(genome)
@@ -107,13 +118,15 @@ var OptimizePlacement3 = (function () {
     // heuristic : 빈 공간 선택 규칙
     // binMode   : 0 = 열린 판재 전체에서 최선, 1 = 먼저 열린 판재부터 (first fit)
     // policy    : 새 판재를 열 때 0 = 가장 작은 판재, 1 = 입력 순서, 2 = 가장 큰 판재
+    // split     : (길로틴 전용) 조각을 놓고 남은 'ㄱ'자 공간을 두 사각형으로 가르는 규칙
     function createGenome(n) {
         return {
             order: new Int32Array(n),
             mask: new Uint8Array(n).fill(3),
             heuristic: 0,
             binMode: 0,
-            policy: 0
+            policy: 0,
+            split: 0
         };
     }
 
@@ -123,12 +136,15 @@ var OptimizePlacement3 = (function () {
         target.heuristic = source.heuristic;
         target.binMode = source.binMode;
         target.policy = source.policy;
+        target.split = source.split;
     }
 
-    // 결과 비교 : 배치 넓이 큰 쪽 -> 사용 판재 넓이 작은 쪽 -> 채움을 몰아준 쪽
+    // 결과 비교 : 배치 넓이 -> 사용 판재 넓이 -> 자투리 집중 -> 회전 수
     function isBetter(a, b) {
         if (a.placed !== b.placed) return a.placed > b.placed;
         if (a.used !== b.used) return a.used < b.used;
+        if (a.offcut !== b.offcut) return a.offcut > b.offcut;
+        if (a.rotated !== b.rotated) return a.rotated < b.rotated;
         return a.conc > b.conc;
     }
 
@@ -185,7 +201,8 @@ var OptimizePlacement3 = (function () {
         const scratch = [];
 
         // 가장 좋은 후보
-        let cBin = -1, cX = 0, cY = 0, cRot = 0, cS1 = Infinity, cS2 = Infinity;
+        let cBin = -1, cJ = 0, cX = 0, cY = 0, cRot = 0, cS1 = Infinity, cS2 = Infinity;
+        const guillotine = problem.guillotine;
 
         // 사각형 (x, y, w, h)가 판재 가장자리와 이미 놓인 조각에 닿는 둘레 길이
         function contactLength(b, x, y, w, h) {
@@ -215,7 +232,7 @@ var OptimizePlacement3 = (function () {
             return c;
         }
 
-        function consider(b, fx, fy, fw, fh, w, h, rot, heuristic) {
+        function consider(b, j, fx, fy, fw, fh, w, h, rot, heuristic) {
             const lw = fw - w;
             const lh = fh - h;
             let s1, s2;
@@ -237,6 +254,10 @@ var OptimizePlacement3 = (function () {
                     s1 = fy + h;
                     s2 = fx;
                     break;
+                case 5:  // BSSF, 동점이면 먼저 찾은 자리 (compute.js의 기존 방식과 같은 선택 규칙)
+                    s1 = lw < lh ? lw : lh;
+                    s2 = 0;
+                    break;
                 default: // Contact Point : 닿는 길이가 가장 긴 자리
                     s1 = -contactLength(b, fx, fy, w, h);
                     s2 = fy + h;
@@ -244,7 +265,7 @@ var OptimizePlacement3 = (function () {
             }
 
             if (s1 < cS1 - EPS || (s1 <= cS1 + EPS && s2 < cS2 - EPS)) {
-                cBin = b; cX = fx; cY = fy; cRot = rot; cS1 = s1; cS2 = s2;
+                cBin = b; cJ = j; cX = fx; cY = fy; cRot = rot; cS1 = s1; cS2 = s2;
             }
         }
 
@@ -262,10 +283,10 @@ var OptimizePlacement3 = (function () {
                 const fh = f[j + 3] - fy;
 
                 if (originalOk && w0 <= fw + EPS && h0 <= fh + EPS) {
-                    consider(b, fx, fy, fw, fh, w0, h0, 0, heuristic);
+                    consider(b, j, fx, fy, fw, fh, w0, h0, 0, heuristic);
                 }
                 if (rotatedOk && h0 <= fw + EPS && w0 <= fh + EPS) {
-                    consider(b, fx, fy, fw, fh, h0, w0, 1, heuristic);
+                    consider(b, j, fx, fy, fw, fh, h0, w0, 1, heuristic);
                 }
             }
         }
@@ -360,7 +381,43 @@ var OptimizePlacement3 = (function () {
             }
         }
 
-        function place(i, mask, heuristic, binMode, policy) {
+        // 길로틴 분할 : 빈 사각형 j의 왼쪽 위에 w x h 조각을 놓고, 남은 'ㄱ'자 공간을 서로 겹치지 않는 두 사각형으로 가른다.
+        //   가로로 가르면 : 오른쪽 = (남는 너비 x h), 아래쪽 = (전체 너비 x 남는 높이)
+        //   세로로 가르면 : 오른쪽 = (남는 너비 x 전체 높이), 아래쪽 = (w x 남는 높이)
+        function splitGuillotine(b, j, w, h, rule) {
+            const f = free[b];
+            const fx = f[j], fy = f[j + 1], fr = f[j + 2], fb = f[j + 3];
+            const fw = fr - fx;
+            const fh = fb - fy;
+            const rw = fw - w;     // 오른쪽에 남는 너비
+            const rh = fh - h;     // 아래쪽에 남는 높이
+
+            let horizontal;
+            switch (rule) {
+                case 0:  horizontal = rw <= rh; break;               // 남는 변이 짧은 쪽으로 가른다
+                case 1:  horizontal = !(rw <= rh); break;            // 남는 변이 긴 쪽
+                case 2:  horizontal = w * rh > rw * h; break;        // 큰 조각이 하나 남도록(작은 쪽 넓이 최소)
+                case 3:  horizontal = w * rh <= rw * h; break;       // 두 조각이 비슷하게 남도록
+                case 4:  horizontal = fw <= fh; break;               // 빈 공간의 짧은 변 기준
+                default: horizontal = !(fw <= fh); break;            // 빈 공간의 긴 변 기준
+            }
+
+            const last = f.length - 4;
+            f[j] = f[last]; f[j + 1] = f[last + 1]; f[j + 2] = f[last + 2]; f[j + 3] = f[last + 3];
+            f.length = last;
+
+            const rightBottom = horizontal ? fy + h : fb;
+            const bottomRight = horizontal ? fr : fx + w;
+
+            if (rw > EPS && rightBottom - fy > EPS && fr - (fx + w) >= minW - EPS && rightBottom - fy >= minH - EPS) {
+                f.push(fx + w, fy, fr, rightBottom);
+            }
+            if (rh > EPS && bottomRight - fx >= minW - EPS && fb - (fy + h) >= minH - EPS) {
+                f.push(fx, fy + h, bottomRight, fb);
+            }
+        }
+
+        function place(i, mask, heuristic, binMode, policy, splitRule) {
             cBin = -1;
             cS1 = Infinity;
             cS2 = Infinity;
@@ -400,7 +457,13 @@ var OptimizePlacement3 = (function () {
             pbin[i] = cBin;
             prot[i] = cRot;
             placedRects[cBin].push(cX, cY, cX + w, cY + h);
-            split(cBin, cX, cY, cX + w, cY + h);
+
+            if (guillotine) {
+                splitGuillotine(cBin, cJ, w, h, splitRule);
+            } else {
+                split(cBin, cX, cY, cX + w, cY + h);
+            }
+
             return true;
         }
 
@@ -420,14 +483,30 @@ var OptimizePlacement3 = (function () {
 
             let used = 0;
             let conc = 0;
+            let offcut = 0;
             for (let b = 0; b < m; b++) {
-                if (isOpen[b]) {
-                    used += BAREA[b];
-                    conc += fill[b] * fill[b];
+                if (!isOpen[b]) continue;
+
+                used += BAREA[b];
+                conc += fill[b] * fill[b];
+
+                // 이 판에 남은 가장 큰 연속 빈 사각형 (MaxRects는 최대 빈 사각형 목록이라 그대로 읽으면 되고,
+                // 길로틴은 서로 겹치지 않는 빈 사각형 목록이라 "한 번의 직선 절단으로 떼어낼 수 있는 자투리"가 된다)
+                const f = free[b];
+                let largest = 0;
+                for (let j = 0; j < f.length; j += 4) {
+                    const area = (f[j + 2] - f[j]) * (f[j + 3] - f[j + 1]);
+                    if (area > largest) largest = area;
                 }
+                offcut += largest * largest;
             }
 
-            return { placed: placed, count: count, used: used, conc: conc, bins: openCount };
+            let rotated = 0;
+            for (let i = 0; i < n; i++) {
+                if (pbin[i] >= 0 && prot[i] === 1) rotated++;
+            }
+
+            return { placed: placed, count: count, used: used, conc: conc, offcut: offcut, rotated: rotated, bins: openCount };
         }
 
         function decode(genome) {
@@ -449,8 +528,8 @@ var OptimizePlacement3 = (function () {
                 const i = order[k];
                 const mask = masks[i];
 
-                if (!place(i, mask, genome.heuristic, genome.binMode, genome.policy) && mask !== 3) {
-                    place(i, 3, genome.heuristic, genome.binMode, genome.policy);
+                if (!place(i, mask, genome.heuristic, genome.binMode, genome.policy, genome.split) && mask !== 3) {
+                    place(i, 3, genome.heuristic, genome.binMode, genome.policy, genome.split);
                 }
             }
 
@@ -567,30 +646,34 @@ var OptimizePlacement3 = (function () {
         const orders = createSortedOrders(problem);
         const binModes = hetero ? [0, 1, 2] : m > 1 ? [0, 1] : [0];
         const policies = hetero ? [0, 1, 2] : [0];
+        const splits = problem.guillotine ? Array.from({ length: SPLIT_COUNT }, (_, k) => k) : [0];
         let stopped = 'stagnation';
 
         construct:
         for (const order of orders) {
-            for (let heuristic = 0; heuristic < HEURISTIC_COUNT; heuristic++) {
-                for (const binMode of binModes) {
-                    for (const policy of policies) {
-                        trial.order.set(order);
-                        trial.mask.fill(3);
-                        trial.heuristic = heuristic;
-                        trial.binMode = binMode;
-                        trial.policy = policy;
+            for (const split of splits) {
+                for (let heuristic = 0; heuristic < HEURISTIC_COUNT; heuristic++) {
+                    for (const binMode of binModes) {
+                        for (const policy of policies) {
+                            trial.order.set(order);
+                            trial.mask.fill(3);
+                            trial.heuristic = heuristic;
+                            trial.binMode = binMode;
+                            trial.policy = policy;
+                            trial.split = split;
 
-                        const result = decoder.decode(trial);
-                        decodes++;
+                            const result = decoder.decode(trial);
+                            decodes++;
 
-                        if (!bestResult || isBetter(result, bestResult)) {
-                            copyGenome(best, trial);
-                            bestResult = result;
-                        }
+                            if (!bestResult || isBetter(result, bestResult)) {
+                                copyGenome(best, trial);
+                                bestResult = result;
+                            }
 
-                        if (nowMs() - startedAt > timeLimit) {
-                            stopped = 'time';
-                            break construct;
+                            if (nowMs() - startedAt > timeLimit) {
+                                stopped = 'time';
+                                break construct;
+                            }
                         }
                     }
                 }
@@ -603,10 +686,11 @@ var OptimizePlacement3 = (function () {
 
         function checkLowerBound() {
             if (bestResult.count === n && bestResult.bins <= lowerBound) {
-                if (bestResult.bins <= 1) {
-                    done = true;                       // 한 장에 다 들어갔다 : 더 줄일 것이 없다
+                // 판 수는 더 줄일 수 없다 : 자투리 모양과 회전 수를 다듬는 마무리만 짧게 한다
+                if (n === 1) {
+                    done = true;
                 } else {
-                    polishLeft = Math.min(polishLeft, 60 * n + 300);   // 마지막 판재를 비우는 마무리만 짧게
+                    polishLeft = 100 * n + 500;        // 더 좋은 해를 찾을 때마다 다시 채워진다
                 }
             }
         }
@@ -639,6 +723,12 @@ var OptimizePlacement3 = (function () {
 
         function mutate(genome) {
             const order = genome.order;
+
+            if (problem.guillotine && rng() < 0.08) {      // 길로틴 분할 규칙 바꾸기
+                genome.split = pickIndex(SPLIT_COUNT);
+                return;
+            }
+
             const r = rng();
 
             if (n >= 2 && r < 0.30) {                      // 두 조각 위치 교환
@@ -717,7 +807,7 @@ var OptimizePlacement3 = (function () {
         let sinceBest = 0;
         let sinceKick = 0;
         const kickAfter = Math.max(150, n * 4);
-        const stagnationLimit = Number.isFinite(Number(options.stagnation)) ? Number(options.stagnation) : Math.max(2500, n * 120);
+        const stagnationLimit = Number.isFinite(Number(options.stagnation)) ? Number(options.stagnation) : Math.max(20000, n * 400);
 
         while (!done) {
             if (iterations >= maxIterations) { stopped = 'iterations'; break; }
