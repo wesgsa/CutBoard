@@ -60,6 +60,7 @@
             from,
             to,
             piece_id: piece ? piece.piece_id : null,
+            piece_copy_index: piece ? Number(piece.piece_copy_index || 0) : null,
             board_id: boardPlacement.board_id,
             board_copy_index: Number(boardPlacement.board_copy_index || 0),
             piece_rotated: Boolean(piece && piece.piece_rotated),
@@ -67,34 +68,118 @@
         };
     }
 
-    // 일반 모드: 조각의 위, 오른쪽, 아래, 왼쪽 경계를 차례로 표시합니다.
-    function makeFreeCutSteps(boardPlacement, placements) {
+    function pieceKey(piece) {
+        return `${piece.piece_id}:${Number(piece.piece_copy_index || 0)}`;
+    }
+
+    // 일반 모드: 한 단계마다 조각 하나가 판에서 분리되는 결과를 만듭니다.
+    function makeFreeCutSteps(boardPlacement, boardRect, placements) {
         const steps = [];
 
-        for (const piece of placements) {
-            const width = piece.right - piece.left;
-            const height = piece.bottom - piece.top;
-            const cutList = [
-                { axis: 'horizontal', position: piece.top, from: piece.left, to: piece.right, side: '위쪽' },
-                { axis: 'vertical', position: piece.right, from: piece.top, to: piece.bottom, side: '오른쪽' },
-                { axis: 'horizontal', position: piece.bottom, from: piece.left, to: piece.right, side: '아래쪽' },
-                { axis: 'vertical', position: piece.left, from: piece.top, to: piece.bottom, side: '왼쪽' }
-            ];
+        const candidates = [];
+        const addAlignedGroups = (axis, keyA, keyB) => {
+            const rows = new Map();
+            for (const piece of placements) {
+                const key = `${piece[keyA]}:${piece[keyB]}`;
+                if (!rows.has(key)) rows.set(key, []);
+                rows.get(key).push(piece);
+            }
+            for (const group of rows.values()) {
+                if (group.length < 2) continue;
+                const rect = {
+                    left: Math.min(...group.map(piece => piece.left)),
+                    top: Math.min(...group.map(piece => piece.top)),
+                    right: Math.max(...group.map(piece => piece.right)),
+                    bottom: Math.max(...group.map(piece => piece.bottom))
+                };
+                const groupKeys = new Set(group.map(pieceKey));
+                const blocked = placements.some(piece =>
+                    !groupKeys.has(pieceKey(piece)) &&
+                    piece.left < rect.right && piece.right > rect.left &&
+                    piece.top < rect.bottom && piece.bottom > rect.top
+                );
+                if (!blocked) candidates.push({ axis, group, rect });
+            }
+        };
 
-            for (const cut of cutList) {
-                steps.push(makeStep(
-                    boardPlacement,
-                    piece,
-                    cut.axis,
-                    cut.position,
-                    cut.from,
-                    cut.to,
-                    `${piece.width} × ${piece.height} 조각 ${cut.side} 절단`
-                ));
+        addAlignedGroups('row', 'top', 'bottom');
+        addAlignedGroups('column', 'left', 'right');
+        candidates.sort((a, b) => b.group.length - a.group.length ||
+            ((a.rect.right - a.rect.left) * (a.rect.bottom - a.rect.top)) -
+            ((b.rect.right - b.rect.left) * (b.rect.bottom - b.rect.top)));
+
+        const groups = [];
+        const used = new Set();
+        for (const candidate of candidates) {
+            if (candidate.group.some(piece => used.has(pieceKey(piece)))) continue;
+            const groupKeys = new Set(candidate.group.map(pieceKey));
+            const blockedByRemaining = placements.some(piece =>
+                !groupKeys.has(pieceKey(piece)) && !used.has(pieceKey(piece)) &&
+                piece.left < candidate.rect.right && piece.right > candidate.rect.left &&
+                piece.top < candidate.rect.bottom && piece.bottom > candidate.rect.top
+            );
+            if (blockedByRemaining) continue;
+            groups.push(candidate);
+            candidate.group.forEach(piece => used.add(pieceKey(piece)));
+        }
+
+        for (const piece of placements) {
+            if (!used.has(pieceKey(piece))) {
+                groups.push({
+                    axis: 'piece',
+                    group: [piece],
+                    rect: { left: piece.left, top: piece.top, right: piece.right, bottom: piece.bottom }
+                });
             }
         }
 
+        for (const operation of groups) {
+            const group = operation.group;
+            const rect = operation.rect;
+            const width = rect.right - rect.left;
+            const height = rect.bottom - rect.top;
+            const piece = group.length === 1 ? group[0] : null;
+            const step = makeStep(
+                boardPlacement,
+                piece,
+                operation.axis,
+                null,
+                null,
+                null,
+                `${group.length}개 조각 묶음 ${width} × ${height} mm 분리`,
+                'free-group'
+            );
+            step.active_region = { ...boardRect };
+            step.detached_rect = {
+                left: rect.left,
+                top: rect.top,
+                right: rect.right,
+                bottom: rect.bottom,
+                width,
+                height
+            };
+            step.active_piece_keys = group.map(pieceKey);
+            step.detached_piece_keys = group.map(pieceKey);
+            step.group_count = group.length;
+            steps.push(step);
+        }
+
         return steps;
+    }
+
+    function makeOptimizedFreeSteps(boardPlacement, boardRect, placements, kerf) {
+        const sliced = makeGuillotineSteps(boardPlacement, boardRect, placements, kerf);
+        if (sliced.success) {
+            for (const step of sliced.steps) {
+                step.type = 'free-slice';
+                step.label = `직선 분할 · ${step.axis === 'vertical' ? '세로' : '가로'} · ${step.position} mm`;
+            }
+            return sliced.steps;
+        }
+
+        // 직선 분할로 전체를 나눌 수 없는 일반 배치는 같은 줄/열의
+        // 조각을 한 묶음으로 정리한 뒤 나머지 조각을 처리합니다.
+        return makeFreeCutSteps(boardPlacement, boardRect, placements);
     }
 
     function getSplitCandidates(region, placements, kerf) {
@@ -150,8 +235,12 @@
 
     function makeGuillotineSteps(boardPlacement, boardRect, placements, kerf) {
         const steps = [];
+        let visitedNodes = 0;
+        const searchLimit = 12000;
 
         function visit(region, items) {
+            visitedNodes++;
+            if (visitedNodes > searchLimit) return false;
             if (!items.length) return true;
             if (items.length === 1) {
                 const piece = items[0];
@@ -162,7 +251,29 @@
                     Math.abs(region.bottom - piece.bottom) < epsilon) return true;
             }
 
-            for (const split of getSplitCandidates(region, items, kerf)) {
+            const rankedSplits = getSplitCandidates(region, items, kerf)
+                .map(split => {
+                    const groups = splitPlacements(region, items, split);
+                    if (!groups) return null;
+                    const area = group => group.reduce((sum, piece) =>
+                        sum + Math.max(0, piece.right - piece.left) * Math.max(0, piece.bottom - piece.top), 0);
+                    const lowArea = area(groups.low);
+                    const highArea = area(groups.high);
+                    const totalArea = Math.max(1, lowArea + highArea);
+                    const balance = groups.low.length && groups.high.length
+                        ? Math.abs(lowArea - highArea) / totalArea
+                        : 2;
+                    const cutLength = split.axis === 'vertical'
+                        ? region.bottom - region.top
+                        : region.right - region.left;
+                    const score = balance + cutLength / Math.max(region.right - region.left, region.bottom - region.top, 1) * .05;
+                    return { split, score };
+                })
+                .filter(Boolean)
+                .sort((a, b) => a.score - b.score || a.split.position - b.split.position);
+
+            for (const ranked of rankedSplits) {
+                const split = ranked.split;
                 const groups = splitPlacements(region, items, split);
                 if (!groups) continue;
 
@@ -189,6 +300,13 @@
                 const highRegion = split.axis === 'vertical'
                     ? { ...region, left: split.position }
                     : { ...region, top: split.position };
+
+                step.active_region = { ...region };
+                step.active_piece_keys = items.map(pieceKey);
+                step.result_regions = [
+                    { ...lowRegion, piece_keys: groups.low.map(pieceKey) },
+                    { ...highRegion, piece_keys: groups.high.map(pieceKey) }
+                ];
 
                 // 자른 뒤 두 영역 안쪽의 절단을 이어서 기록합니다.
                 const start = steps.length;
@@ -251,7 +369,12 @@
             }
 
             if (!options.guillotine) {
-                steps.push(...makeFreeCutSteps(boardPlacement, placements));
+                steps.push(...makeOptimizedFreeSteps(
+                    boardPlacement,
+                    boardRect,
+                    placements,
+                    Math.max(0, getNumber(options.kerf, 0))
+                ));
                 continue;
             }
 
