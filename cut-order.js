@@ -59,10 +59,10 @@
             position,
             from,
             to,
-            piece_id: piece.piece_id,
+            piece_id: piece ? piece.piece_id : null,
             board_id: boardPlacement.board_id,
             board_copy_index: Number(boardPlacement.board_copy_index || 0),
-            piece_rotated: Boolean(piece.piece_rotated),
+            piece_rotated: Boolean(piece && piece.piece_rotated),
             label
         };
     }
@@ -144,7 +144,7 @@
             }
         }
 
-        if (!low.length || !high.length) return null;
+        if (!low.length && !high.length) return null;
         return { low, high };
     }
 
@@ -152,22 +152,29 @@
         const steps = [];
 
         function visit(region, items) {
-            if (items.length <= 1) return true;
+            if (!items.length) return true;
+            if (items.length === 1) {
+                const piece = items[0];
+                const epsilon = 1e-7;
+                if (Math.abs(region.left - piece.left) < epsilon &&
+                    Math.abs(region.right - piece.right) < epsilon &&
+                    Math.abs(region.top - piece.top) < epsilon &&
+                    Math.abs(region.bottom - piece.bottom) < epsilon) return true;
+            }
 
             for (const split of getSplitCandidates(region, items, kerf)) {
                 const groups = splitPlacements(region, items, split);
                 if (!groups) continue;
 
-                const representative = groups.low[groups.low.length - 1];
                 const from = split.axis === 'vertical' ? region.top : region.left;
                 const to = split.axis === 'vertical' ? region.bottom : region.right;
                 const label = split.axis === 'vertical'
-                    ? `세로 절단 · 위치 ${split.position} mm`
-                    : `가로 절단 · 위치 ${split.position} mm`;
+                    ? `세로 절단 · 왼쪽 경계에서 ${split.position} mm`
+                    : `가로 절단 · 위쪽 경계에서 ${split.position} mm`;
 
                 const step = makeStep(
                     boardPlacement,
-                    representative,
+                    null,
                     split.axis,
                     split.position,
                     from,
@@ -186,7 +193,9 @@
                 // 자른 뒤 두 영역 안쪽의 절단을 이어서 기록합니다.
                 const start = steps.length;
                 steps.push(step);
-                if (visit(lowRegion, groups.low) && visit(highRegion, groups.high)) return true;
+                const lowSuccess = groups.low.length ? visit(lowRegion, groups.low) : true;
+                const highSuccess = groups.high.length ? visit(highRegion, groups.high) : true;
+                if (lowSuccess && highSuccess) return true;
                 steps.length = start;
             }
 

@@ -161,6 +161,121 @@
             text-align: center
         }
 
+        .preview-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .cut-order-open {
+            border: 1px solid var(--line);
+            border-radius: 9px;
+            background: var(--soft);
+            color: var(--accent);
+            padding: 8px 11px;
+            font: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer
+        }
+
+        .cut-order-open:disabled {
+            opacity: .45;
+            cursor: not-allowed
+        }
+
+        .cut-modal[hidden] { display: none }
+
+        .cut-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            display: grid;
+            place-items: center;
+            padding: 20px;
+            background: #1d211dcc
+        }
+
+        .cut-dialog {
+            width: min(900px, 100%);
+            max-height: min(92vh, 900px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: var(--panel);
+            box-shadow: 0 24px 80px #0004
+        }
+
+        .cut-dialog-head, .cut-dialog-foot {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--line)
+        }
+
+        .cut-dialog-head strong { font-size: 14px }
+
+        .cut-close, .cut-step-button {
+            min-width: 38px;
+            height: 36px;
+            border: 1px solid var(--line);
+            border-radius: 9px;
+            background: white;
+            color: var(--ink);
+            font-size: 20px;
+            cursor: pointer
+        }
+
+        .cut-step-button:disabled { opacity: .35; cursor: default }
+
+        .cut-dialog-body {
+            overflow: auto;
+            padding: 16px 20px
+        }
+
+        .cut-board-view {
+            display: grid;
+            place-items: center;
+            min-height: 280px;
+            max-height: 52vh;
+            padding: 12px;
+            border-radius: 12px;
+            background: var(--bg)
+        }
+
+        .cut-board-view svg {
+            display: block;
+            max-width: 100%;
+            max-height: 48vh;
+            filter: drop-shadow(0 5px 12px #493b2520)
+        }
+
+        .cut-info {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 12px
+        }
+
+        .cut-info div {
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 9px;
+            color: var(--muted);
+            font-size: 11px
+        }
+
+        .cut-info strong { display: block; color: var(--ink); margin-top: 4px; font-size: 12px }
+
+        .cut-dialog-foot { border-top: 1px solid var(--line); border-bottom: 0 }
+        .cut-step-count { color: var(--muted); font-size: 11px }
+        .cut-nav { display: flex; gap: 8px }
+        .cut-status { margin-top: 10px; color: var(--muted); font-size: 10px; line-height: 1.5 }
+
         .stage {
             height: calc(100% - 58px);
             display: flex;
@@ -608,8 +723,11 @@
                 <section class="card preview">
                     <div class="preview-head">
                         <div>현재 작업<strong id="boardtitle">배치 결과를 기다리는 중</strong></div>
-                        <div class="boards" id="boardnav"><button id="pb">‹</button><span id="bi">1 / 1</span><button
-                                id="nb">›</button></div>
+                        <div class="preview-actions">
+                            <button class="cut-order-open" id="cutOrderOpen" disabled>절단 순서 보기</button>
+                            <div class="boards" id="boardnav"><button id="pb">‹</button><span id="bi">1 / 1</span><button
+                                    id="nb">›</button></div>
+                        </div>
                     </div>
                     <div class="stage">
                         <div class="board" id="board"><span class="dim dimw" id="dw">—</span><span class="dim dimh"
@@ -691,6 +809,26 @@
             </aside>
         </div>
     </div>
+    <div class="cut-modal" id="cutModal" hidden>
+        <section class="cut-dialog" role="dialog" aria-modal="true" aria-labelledby="cutDialogTitle">
+            <div class="cut-dialog-head">
+                <strong id="cutDialogTitle">절단 순서</strong>
+                <button class="cut-close" id="cutClose" aria-label="닫기">×</button>
+            </div>
+            <div class="cut-dialog-body">
+                <div class="cut-board-view" id="cutBoardView"></div>
+                <div class="cut-info" id="cutInfo"></div>
+                <div class="cut-status" id="cutStatus"></div>
+            </div>
+            <div class="cut-dialog-foot">
+                <span class="cut-step-count" id="cutStepCount">0 / 0</span>
+                <div class="cut-nav">
+                    <button class="cut-step-button" id="cutPrevious" aria-label="이전 절단" disabled>‹</button>
+                    <button class="cut-step-button" id="cutNext" aria-label="다음 절단" disabled>›</button>
+                </div>
+            </div>
+        </section>
+    </div>
     <script src="./optimize.js"></script>
     <script src="./cut-order.js"></script>
     <script>
@@ -701,7 +839,11 @@
                 { id: 2, width: 600, height: 400, quantity: 1 }
             ],
             layout: [],
-            board: 0
+            board: 0,
+            cutSteps: [],
+            cutStepIndex: 0,
+            cutOrderResult: null,
+            cutSettings: null
         };
 
         let bid = 1;
@@ -785,6 +927,9 @@
 
         function reset() {
             S.layout = [];
+            S.cutSteps = [];
+            S.cutOrderResult = null;
+            $('#cutOrderOpen').disabled = true;
             $('#usage').textContent = '— %';
             $('#placed').textContent = '— 개';
             $('#failed').textContent = '— 개';
@@ -803,6 +948,7 @@
             const boardCopies = usedCopies();
             S.board = Math.min(S.board, Math.max(0, boardCopies.length - 1));
             const selected = current();
+            $('#cutOrderOpen').disabled = S.layout.length === 0;
 
             $('#boardnav').classList.toggle('on', boardCopies.length > 1);
             $('#bi').textContent = `${boardCopies.length ? S.board + 1 : 0} / ${boardCopies.length}`;
@@ -999,6 +1145,121 @@
             $('#used').textContent = `${summary.used} 장`;
         }
 
+        function openCutOrder() {
+            if (!S.layout.length) return;
+
+            S.cutSettings = {
+                guillotine: $('#guillotine').checked,
+                edge_margin: Number($('#edgeMargin').value),
+                kerf: Number($('#kerf').value)
+            };
+            S.cutOrderResult = computeCutOrder(S.layout, S.boards, S.pieces, S.cutSettings);
+            S.cutSteps = S.cutOrderResult.steps;
+            S.cutStepIndex = 0;
+            $('#cutModal').hidden = false;
+            document.body.style.overflow = 'hidden';
+            renderCutStep();
+        }
+
+        function renderCutStep() {
+            const step = S.cutSteps[S.cutStepIndex];
+            const isGuillotine = S.cutSettings && S.cutSettings.guillotine;
+            const total = S.cutSteps.length;
+            const board = step && findBoardForStep(step);
+
+            $('#cutDialogTitle').textContent = isGuillotine ? '길로틴 절단 순서' : '일반 절단 순서';
+            $('#cutStepCount').textContent = total ? `${S.cutStepIndex + 1} / ${total} 단계` : '절단 단계 없음';
+            $('#cutPrevious').disabled = !total || S.cutStepIndex <= 0;
+            $('#cutNext').disabled = !total || S.cutStepIndex >= total - 1;
+
+            if (!step || !board) {
+                $('#cutBoardView').innerHTML = '<div>표시할 절단 단계가 없습니다.</div>';
+                $('#cutInfo').innerHTML = '';
+                $('#cutStatus').textContent = S.cutOrderResult && S.cutOrderResult.reason
+                    ? S.cutOrderResult.reason
+                    : '현재 배치 결과가 없습니다.';
+                return;
+            }
+
+            const placements = S.layout.filter(item =>
+                String(item.board_id) === String(step.board_id) &&
+                Number(item.board_copy_index || 0) === Number(step.board_copy_index || 0)
+            );
+            const width = Number(board.width);
+            const height = Number(board.height);
+            const highlighted = placements.find(item => String(item.piece_id) === String(step.piece_id));
+            const svgPieces = placements.map(item => {
+                const piece = S.pieces.find(value => String(value.id) === String(item.piece_id));
+                if (!piece) return '';
+                const pieceWidth = Number(item.width) || (item.piece_rotated ? Number(piece.height) : Number(piece.width));
+                const pieceHeight = Number(item.height) || (item.piece_rotated ? Number(piece.width) : Number(piece.height));
+                const color = colors[(Number(piece.id) - 1) % colors.length];
+                const active = highlighted === item;
+                const fontSize = Math.max(12, Math.min(width, height) * .022);
+                return `<g>
+                    <rect x="${item.x}" y="${item.y}" width="${pieceWidth}" height="${pieceHeight}"
+                        fill="${color}" fill-opacity=".94" stroke="${active ? '#d54132' : '#36423a'}"
+                        stroke-width="${active ? Math.max(5, fontSize * .35) : Math.max(2, fontSize * .14)}" />
+                    <text x="${Number(item.x) + pieceWidth / 2}" y="${Number(item.y) + pieceHeight / 2}"
+                        text-anchor="middle" dominant-baseline="middle" fill="white"
+                        font-size="${fontSize}" font-weight="700">${pieceWidth} × ${pieceHeight}</text>
+                </g>`;
+            }).join('');
+
+            const cutLine = step.axis === 'vertical'
+                ? `<line x1="${step.position}" y1="${step.from}" x2="${step.position}" y2="${step.to}" />
+                   <circle cx="${step.position}" cy="${step.from}" r="${Math.max(width, height) * .008}" />
+                   <circle cx="${step.position}" cy="${step.to}" r="${Math.max(width, height) * .008}" />`
+                : `<line x1="${step.from}" y1="${step.position}" x2="${step.to}" y2="${step.position}" />
+                   <circle cx="${step.from}" cy="${step.position}" r="${Math.max(width, height) * .008}" />
+                   <circle cx="${step.to}" cy="${step.position}" r="${Math.max(width, height) * .008}" />`;
+
+            $('#cutBoardView').innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="절단 단계 배치도">
+                <rect x="0" y="0" width="${width}" height="${height}" fill="#efe8d5" stroke="#b8ad96" stroke-width="${Math.max(2, Math.max(width, height) * .002)}" />
+                ${svgPieces}
+                <g fill="none" stroke="#d54132" stroke-width="${Math.max(5, Math.max(width, height) * .004)}"
+                   stroke-dasharray="${Math.max(12, Math.max(width, height) * .012)} ${Math.max(7, Math.max(width, height) * .007)}"
+                   vector-effect="non-scaling-stroke">${cutLine}</g>
+            </svg>`;
+
+            const targetPiece = step.piece_id == null
+                ? null
+                : S.pieces.find(item => String(item.id) === String(step.piece_id));
+            const targetPlacement = targetPiece && placements.find(item => String(item.piece_id) === String(step.piece_id));
+            const targetWidth = targetPlacement
+                ? Number(targetPlacement.width) || (targetPlacement.piece_rotated ? Number(targetPiece.height) : Number(targetPiece.width))
+                : null;
+            const targetHeight = targetPlacement
+                ? Number(targetPlacement.height) || (targetPlacement.piece_rotated ? Number(targetPiece.width) : Number(targetPiece.height))
+                : null;
+            const axisName = step.axis === 'vertical' ? '세로 절단선' : '가로 절단선';
+            const coordinateName = step.axis === 'vertical' ? '판 왼쪽에서 X' : '판 위쪽에서 Y';
+            const cutLength = Math.abs(Number(step.to) - Number(step.from));
+            const values = [
+                ['대상 판재', `판재 #${step.board_id} · ${Number(step.board_copy_index) + 1}번째 · ${board.width} × ${board.height} mm`],
+                ['절단 방향', `${axisName} · ${step.axis === 'vertical' ? '위에서 아래로' : '왼쪽에서 오른쪽으로'}`],
+                ['절단 좌표', `${coordinateName} = ${Number(step.position).toFixed(1)} mm`],
+                ['절단 범위', `${step.axis === 'vertical' ? 'Y' : 'X'} ${Number(step.from).toFixed(1)} ~ ${Number(step.to).toFixed(1)} mm · 길이 ${cutLength.toFixed(1)} mm`],
+                ['절단 대상 조각', targetPiece ? `${targetWidth} × ${targetHeight} mm${targetPlacement.piece_rotated ? ' · 회전 배치' : ''}` : '판재를 두 영역으로 분할'],
+                ['톱날 / 가장자리 여유', `${S.cutSettings.kerf} mm / ${S.cutSettings.edge_margin} mm`]
+            ];
+            $('#cutInfo').innerHTML = values.map(([label, value]) =>
+                `<div>${esc(label)}<strong>${esc(value)}</strong></div>`
+            ).join('');
+            $('#cutStatus').textContent = S.cutOrderResult.reason || (isGuillotine
+                ? '점선은 현재 남은 재료를 끝까지 가로지르는 절단선입니다.'
+                : '점선은 조각 경계를 따라 표시한 순서 안내선입니다. 일반 모드는 실제 톱 절단 가능성을 보장하지 않습니다.');
+        }
+
+        function findBoardForStep(step) {
+            return S.boards.find(item => String(item.id) === String(step.board_id));
+        }
+
+        function closeCutOrder() {
+            $('#cutModal').hidden = true;
+            document.body.style.overflow = '';
+        }
+
         async function run() {
             const errors = validate();
             if (errors.length) {
@@ -1055,6 +1316,32 @@
         };
 
         $('#run').onclick = run;
+        ['#rotation', '#guillotine', '#kerf', '#edgeMargin'].forEach(selector => {
+            $(selector).onchange = () => {
+                if (!$('#cutModal').hidden) closeCutOrder();
+                reset();
+                draw();
+            };
+        });
+        $('#cutOrderOpen').onclick = openCutOrder;
+        $('#cutClose').onclick = closeCutOrder;
+        $('#cutPrevious').onclick = () => {
+            S.cutStepIndex = Math.max(0, S.cutStepIndex - 1);
+            renderCutStep();
+        };
+        $('#cutNext').onclick = () => {
+            S.cutStepIndex = Math.min(S.cutSteps.length - 1, S.cutStepIndex + 1);
+            renderCutStep();
+        };
+        $('#cutModal').onclick = event => {
+            if (event.target === $('#cutModal')) closeCutOrder();
+        };
+        window.addEventListener('keydown', event => {
+            if ($('#cutModal').hidden) return;
+            if (event.key === 'Escape') closeCutOrder();
+            if (event.key === 'ArrowLeft') $('#cutPrevious').click();
+            if (event.key === 'ArrowRight') $('#cutNext').click();
+        });
         $('#pb').onclick = () => {
             S.board = Math.max(0, S.board - 1);
             draw();
